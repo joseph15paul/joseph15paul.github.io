@@ -1,111 +1,577 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Angamaly Solar Chrono</title>
-    <!-- Tailwind via CDN for dev -->
+    <title>3D Solar Astrolabe - Angamaly</title>
+    <!-- Tailwind via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-        
+
         body {
             background-color: #050505;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #050505 80%);
             overflow: hidden;
             font-family: 'Share Tech Mono', monospace;
-            cursor: none; /* Custom cursor */
-        }
-        
-        .sun-cursor {
-            pointer-events: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(255,215,0,0.8) 0%, rgba(255,165,0,0) 70%);
-            box-shadow: 0 0 20px #FFD700;
-            transform: translate(-50%, -50%);
-            z-index: 9999;
-            mix-blend-mode: screen;
-        }
-
-        .data-rain-bg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100vw;
+            cursor: none;
             height: 100vh;
-            z-index: 1;
-            pointer-events: none;
+            width: 100vw;
+            margin: 0;
+            padding: 0;
         }
 
-        .chrono-container {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 10;
+        /* 3D Environment */
+        .scene-container {
+            perspective: 1000px;
+            width: 100%;
+            height: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
+            overflow: hidden;
         }
-        
-        .chrono-dial {
-            width: 800px;
-            height: 800px;
-            position: absolute;
-        }
-        
-        .info-panel {
+
+        .world {
             position: relative;
-            z-index: 20;
+            width: 100vw;
+            height: 100vh;
+            transform-style: preserve-3d;
+            transform-origin: center center 0px;
+        }
+
+        .layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform-style: preserve-3d;
+        }
+
+        /* Layers */
+        .layer-rain {
+            transform: translateZ(-200px);
+        }
+
+        .layer-rings {
+            transform: translateZ(0px);
+        }
+
+        .layer-info {
+            transform: translateZ(50px);
+        }
+
+        .layer-hud {
+            transform: translateZ(100px);
+        }
+
+        /* Sun Center */
+        .sun-central {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #FFD700 30%, transparent 70%);
+            box-shadow: 0 0 40px #FFD700, inset 0 0 20px #FFF;
+            transform: translate(-50%, -50%);
+            mix-blend-mode: screen;
+            z-index: 50;
+        }
+
+        /* Info Panel */
+        .info-panel {
             text-align: center;
             color: #FFD700;
             text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            background: rgba(0, 0, 0, 0.4);
+            padding: 2rem;
+            border-radius: 1rem;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 215, 0, 0.1);
         }
-        
+
         .time-display {
             font-size: 5rem;
             font-weight: bold;
             letter-spacing: 0.1em;
+            line-height: 1;
         }
-        
+
         .date-display {
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             color: #7B2CBF;
             letter-spacing: 0.3em;
             text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        /* HUD */
+        .hud-corner {
+            position: absolute;
+            padding: 1rem;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+            border: 1px solid rgba(123, 44, 191, 0.3);
+            background: rgba(5, 5, 5, 0.6);
+        }
+
+        .hud-tl {
+            top: 2rem;
+            left: 2rem;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .hud-tr {
+            top: 2rem;
+            right: 2rem;
+            border-left: none;
+            border-bottom: none;
+            text-align: right;
+        }
+
+        .hud-bl {
+            bottom: 2rem;
+            left: 2rem;
+            border-right: none;
+            border-top: none;
+        }
+
+        .hud-br {
+            bottom: 2rem;
+            right: 2rem;
+            border-left: none;
+            border-top: none;
+            text-align: right;
+        }
+
+        .label {
+            display: block;
+            font-size: 0.7rem;
+            color: #7B2CBF;
+            margin-bottom: 0.2rem;
+        }
+
+        .value {
+            font-size: 1.5rem;
+            color: #FFD700;
         }
     </style>
 </head>
+
 <body>
 
-    <div class="sun-cursor"></div>
-    <div class="data-rain-bg"></div>
-    
-    <div class="chrono-container">
-        <div class="chrono-dial">
-            <!-- SVGs injected here -->
-        </div>
-        
-        <div class="info-panel">
-            <div class="date-display">INITIALIZING ORBITAL LINK...</div>
-            <div class="time-display">00:00:00</div>
+    <div class="scene-container">
+        <div class="world">
+            <!-- Background Rain -->
+            <div class="layer layer-rain"></div>
+
+            <!-- Central Sun -->
+            <div class="layer" style="transform: translateZ(-20px)">
+                <div class="sun-central"></div>
+            </div>
+
+            <!-- Rings Container -->
+            <div class="layer layer-rings">
+                <!-- Injected via JS -->
+            </div>
+
+            <!-- Main Time Display -->
+            <div class="layer layer-info">
+                <div class="info-panel">
+                    <div class="date-display">ANGAMALY LINK ESTABLISHED</div>
+                    <div class="time-display">00:00:00</div>
+                </div>
+            </div>
+
+            <!-- HUD Elements -->
+            <div class="layer layer-hud">
+                <div class="hud-corner hud-tl hud-azimuth">
+                    <span class="label">SOLAR AZIMUTH</span>
+                    <span class="value">000.00°</span>
+                </div>
+                <div class="hud-corner hud-tr hud-elevation">
+                    <span class="label">SOLAR ELEVATION</span>
+                    <span class="value">00.00°</span>
+                </div>
+                <div class="hud-corner hud-bl">
+                    <span class="label">LATITUDE</span>
+                    <span class="value">10.1960° N</span>
+                </div>
+                <div class="hud-corner hud-br">
+                    <span class="label">LONGITUDE</span>
+                    <span class="value">76.3860° E</span>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Load Anime.js First -->
-    <script src="../anime.min.js"></script>
-    
-    <!-- Module Logic -->
-    <script type="module" src="./src/main.js"></script>
-    
+    <!-- Anime.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+
+    <!-- Logic & Visuals -->
     <script>
-        // Simple shim if module loading fails locally without server (needs CORS usually)
-        // But for development I assume the user might not open this directly from file:// but if they do, modules break.
-        // I will produce a final single file artifact later anyway.
+        /**
+         * Solar Logic
+         */
+        class SolarCalculator {
+            constructor() {
+                this.latitude = 10.1960;
+                this.longitude = 76.3860;
+                this.standardMeridian = 82.5;
+                this.latRad = this.latitude * (Math.PI / 180);
+            }
+
+            getEquationOfTime(date) {
+                const start = new Date(date.getFullYear(), 0, 0);
+                const diff = date - start;
+                const oneDay = 1000 * 60 * 60 * 24;
+                const dayOfYear = Math.floor(diff / oneDay);
+
+                const B = (360 / 365) * (dayOfYear - 81) * (Math.PI / 180);
+                return 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
+            }
+
+            getSolarNoon(date) {
+                const longDiff = this.standardMeridian - this.longitude;
+                const geoCorrection = longDiff * 4;
+                const eqt = this.getEquationOfTime(date);
+                const totalCorrectionMinutes = geoCorrection - eqt;
+
+                const solarNoon = new Date(date);
+                solarNoon.setHours(12, 0, 0, 0);
+                solarNoon.setMinutes(solarNoon.getMinutes() + Math.floor(totalCorrectionMinutes));
+                solarNoon.setSeconds(solarNoon.getSeconds() + (totalCorrectionMinutes % 1) * 60);
+
+                return solarNoon;
+            }
+
+            getTimeToNextSolarNoon() {
+                const now = new Date();
+                let solarNoon = this.getSolarNoon(now);
+                if (now > solarNoon) {
+                    const tomorrow = new Date(now);
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    solarNoon = this.getSolarNoon(tomorrow);
+                }
+                const diff = solarNoon - now;
+                return { diff, solarNoon };
+            }
+
+            getSolarPosition() {
+                const now = new Date();
+                const start = new Date(now.getFullYear(), 0, 0);
+                const dayOfYear = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+
+                const degToRad = Math.PI / 180;
+                const declination = 23.45 * Math.sin((360 / 365) * (dayOfYear - 81) * degToRad);
+                const declRad = declination * degToRad;
+
+                const eqt = this.getEquationOfTime(now);
+                const lst = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+                const solarTime = lst + (this.longitude - this.standardMeridian) / 15 + eqt / 60;
+
+                const hourAngle = (solarTime - 12) * 15;
+                const haRad = hourAngle * degToRad;
+
+                const sinElev = Math.sin(this.latRad) * Math.sin(declRad) +
+                    Math.cos(this.latRad) * Math.cos(declRad) * Math.cos(haRad);
+                const elevation = Math.asin(sinElev) / degToRad;
+
+                const cosAz = (Math.sin(declRad) - Math.sin(this.latRad) * Math.sin(Math.asin(sinElev))) /
+                    (Math.cos(this.latRad) * Math.cos(Math.asin(sinElev)));
+
+                let azimuth = Math.acos(Math.min(Math.max(cosAz, -1), 1)) / degToRad;
+                if (hourAngle > 0) azimuth = 360 - azimuth;
+
+                return {
+                    azimuth: azimuth.toFixed(2),
+                    elevation: elevation.toFixed(2)
+                };
+            }
+        }
+
+        /**
+         * Visual Controller
+         */
+        class VisualController {
+            constructor() {
+                this.initElements();
+                this.warpActive = false;
+            }
+
+            initElements() {
+                this.world = document.querySelector('.world');
+                this.bgContainer = document.querySelector('.layer-rain');
+                this.dialContainer = document.querySelector('.layer-rings');
+                this.hudAzimuth = document.querySelector('.hud-azimuth .value');
+                this.hudElevation = document.querySelector('.hud-elevation .value');
+                this.timeDisplay = document.querySelector('.time-display');
+                this.dateDisplay = document.querySelector('.date-display');
+                this.sun = document.querySelector('.sun-central');
+            }
+
+            init() {
+                this.createDataRain();
+                this.createChronoRings();
+                this.initParallax();
+                this.initWarp();
+                this.introAnimation();
+            }
+
+            createDataRain() {
+                const total = 100;
+                this.bgContainer.innerHTML = '';
+                const fragment = document.createDocumentFragment();
+
+                for (let i = 0; i < total; i++) {
+                    const el = document.createElement('div');
+                    el.className = 'rain-char absolute text-[#7B2CBF] opacity-40 text-xs font-mono';
+                    const chars = '01▲▼●■XYZΩ';
+                    el.innerText = chars.charAt(Math.floor(Math.random() * chars.length));
+
+                    el.style.left = `${Math.random() * 100}%`;
+                    el.style.top = `${Math.random() * 100}%`;
+                    el.style.transform = `translateZ(${Math.random() * 200 - 100}px)`;
+
+                    fragment.appendChild(el);
+                }
+                this.bgContainer.appendChild(fragment);
+
+                anime({
+                    targets: '.rain-char',
+                    opacity: [
+                        { value: [0, 0.4], easing: 'easeOutSine', duration: 500 },
+                        { value: 0, easing: 'easeInOutQuad', duration: 1200 }
+                    ],
+                    translateY: [
+                        { value: -50, duration: 0 },
+                        { value: 50, duration: 2000 }
+                    ],
+                    delay: anime.stagger(50),
+                    loop: true
+                });
+            }
+
+            createChronoRings() {
+                const ns = "http://www.w3.org/2000/svg";
+
+                const ringDefs = [
+                    { r: 120, dash: [40, 10], width: 2, color: '#7B2CBF', duration: 8000, dir: 'normal', z: 0 },
+                    { r: 180, dash: [100, 20], width: 4, color: '#FFD700', duration: 12000, dir: 'reverse', z: 40 },
+                    { r: 240, dash: [5, 5], width: 1, color: '#7B2CBF', duration: 20000, dir: 'normal', z: 80 },
+                    { r: 320, dash: [200, 100], width: 8, color: '#333', duration: 6000, dir: 'alternate', z: 120 },
+                    { r: 400, dash: [2, 10], width: 15, color: '#FFD700', duration: 4000, dir: 'normal', opacity: 0.1, z: 160 },
+                ];
+
+                this.ringAnims = [];
+
+                ringDefs.forEach((ring, index) => {
+                    const wrapper = document.createElement('div');
+                    // Center in layer-rings (which is full screen)
+                    wrapper.style.position = 'absolute';
+                    wrapper.style.top = '50%';
+                    wrapper.style.left = '50%';
+                    wrapper.style.width = '800px';
+                    wrapper.style.height = '800px';
+                    // 3D positioning
+                    wrapper.style.transform = `translate(-50%, -50%) translateZ(${ring.z}px)`;
+                    wrapper.style.pointerEvents = 'none';
+
+                    const svg = document.createElementNS(ns, "svg");
+                    svg.setAttribute("viewBox", "0 0 800 800");
+                    svg.setAttribute("class", "w-full h-full");
+
+                    const circle = document.createElementNS(ns, "circle");
+                    circle.setAttribute("cx", "400");
+                    circle.setAttribute("cy", "400");
+                    circle.setAttribute("r", ring.r);
+                    circle.setAttribute("fill", "none");
+                    circle.setAttribute("stroke", ring.color);
+                    circle.setAttribute("stroke-width", ring.width);
+                    circle.setAttribute("stroke-dasharray", ring.dash.join(','));
+                    if (ring.opacity) circle.setAttribute("opacity", ring.opacity);
+
+                    svg.appendChild(circle);
+                    wrapper.appendChild(svg);
+                    this.dialContainer.appendChild(wrapper);
+
+                    const anim = anime({
+                        targets: circle,
+                        rotate: ring.dir === 'reverse' ? '-1turn' : '1turn',
+                        duration: ring.duration,
+                        loop: true,
+                        easing: 'linear',
+                        direction: ring.dir === 'alternate' ? 'alternate' : 'normal'
+                    });
+                    this.ringAnims.push(anim);
+                });
+            }
+
+            initParallax() {
+                document.addEventListener('mousemove', (e) => {
+                    if (this.warpActive) return;
+                    const x = (e.clientX / window.innerWidth - 0.5) * 2;
+                    const y = (e.clientY / window.innerHeight - 0.5) * 2;
+
+                    anime({
+                        targets: this.world,
+                        rotateX: -y * 5,
+                        rotateY: x * 5,
+                        easing: 'easeOutQuad',
+                        duration: 100
+                    });
+                });
+            }
+
+            initWarp() {
+                const startWarp = () => {
+                    if (this.warpActive) return;
+                    this.warpActive = true;
+                    document.body.style.cursor = 'wait';
+
+                    // Warp visual
+                    anime({
+                        targets: this.world,
+                        scale: 0.8,
+                        rotateX: 0,
+                        rotateY: 0,
+                        duration: 800,
+                        easing: 'easeInCubic'
+                    });
+
+                    // Spin rings faster
+                    this.ringAnims.forEach(anim => {
+                        anim.pause(); // Pause current loop
+                        anime({
+                            targets: anim.animatables[0].target,
+                            rotate: (el) => {
+                                // getCurrent rotation
+                                return '+=5turn';
+                            },
+                            duration: 3000,
+                            easing: 'easeInExpo'
+                        });
+                    });
+
+                    // Rain accel
+                    anime.remove('.rain-char');
+                    anime({
+                        targets: '.rain-char',
+                        opacity: 0.8,
+                        translateY: [0, window.innerHeight],
+                        duration: 300,
+                        easing: 'linear',
+                        loop: true,
+                        delay: anime.stagger(5)
+                    });
+                };
+
+                const endWarp = () => {
+                    if (!this.warpActive) return;
+                    this.warpActive = false;
+                    document.body.style.cursor = 'none';
+
+                    anime({
+                        targets: this.world,
+                        scale: 1,
+                        duration: 1000,
+                        easing: 'easeOutElastic(1, .5)'
+                    });
+
+                    // Return rings to normal
+                    this.dialContainer.innerHTML = '';
+                    this.createChronoRings();
+
+                    // Return rain to normal
+                    this.createDataRain();
+                };
+
+                document.addEventListener('mousedown', startWarp);
+                document.addEventListener('mouseup', endWarp);
+                document.addEventListener('touchstart', startWarp);
+                document.addEventListener('touchend', endWarp);
+            }
+
+            introAnimation() {
+                anime({
+                    targets: '.layer-rings div',
+                    scale: [0, 1],
+                    opacity: [0, 1],
+                    translateZ: (el, i) => [0, i * 40], // Start flat, pop to depth
+                    duration: 2000,
+                    delay: anime.stagger(200),
+                    easing: 'easeOutElastic(1, .8)'
+                });
+
+                // Glitch reveal for HUD
+                anime({
+                    targets: '.hud-corner',
+                    opacity: [0, 1],
+                    translateX: [20, 0],
+                    delay: anime.stagger(100, { start: 1000 }),
+                    easing: 'easeOutQuad'
+                });
+            }
+
+            updateDisplay(timeStr, msStr, labelText, azimuth, elevation) {
+                this.timeDisplay.innerHTML = `${timeStr}<span class="text-xs ml-2 text-gray-500">${msStr}</span>`;
+                this.dateDisplay.innerText = labelText;
+                this.hudAzimuth.innerText = azimuth + "°";
+                this.hudElevation.innerText = elevation + "°";
+
+                // Pulse Sun
+                const ms = new Date().getMilliseconds();
+                // Smooth breathe 0.9 to 1.1
+                const scale = 1 + Math.sin(ms * 0.003) * 0.15;
+                if (this.sun) {
+                    // Keep the centering translate
+                    this.sun.style.transform = `translate(-50%, -50%) scale(${scale})`;
+                }
+            }
+        }
+
+        // Main Loop
+        document.addEventListener('DOMContentLoaded', () => {
+            const solar = new SolarCalculator();
+            const visuals = new VisualController();
+
+            visuals.init();
+
+            function tick() {
+                const { diff, solarNoon } = solar.getTimeToNextSolarNoon();
+                const pos = solar.getSolarPosition();
+
+                const absDiff = Math.abs(diff);
+                const hours = Math.floor(absDiff / (1000 * 60 * 60));
+                const mins = Math.floor((absDiff % (1000 * 60 * 60)) / (1000 * 60));
+                const secs = Math.floor((absDiff % (1000 * 60)) / 1000);
+                const ms = Math.floor((absDiff % 1000));
+
+                const pad = (n) => n.toString().padStart(2, '0');
+                const padMs = (n) => n.toString().padStart(3, '0');
+
+                const timeStr = `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+                const msStr = padMs(ms);
+
+                let label = "ORBITAL ALIGNMENT IN";
+                if (diff < 0) label = "ALIGNMENT PASSED";
+
+                visuals.updateDisplay(timeStr, msStr, label, pos.azimuth, pos.elevation);
+                requestAnimationFrame(tick);
+            }
+
+            tick();
+        });
     </script>
 </body>
+
 </html>
